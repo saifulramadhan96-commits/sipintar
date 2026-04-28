@@ -36,6 +36,7 @@ export function buildSidebarNav() {
     `;
 
     // MENU INPUT NILAI: Terbuka untuk Guru, Wali Kelas, Wakasek (TETAPI DITUTUP UNTUK ADMIN)
+    // Catatan: Wakasek tetap melihat menu ini agar bisa memasukkan nilai untuk mapel yang ia ajar
     if (!isAdmin) {
         html += `
         <button onclick="window.switchMenu('nilai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
@@ -52,9 +53,9 @@ export function buildSidebarNav() {
         </button>`;
     }
 
-    // MENU KELOLA SISWA: Admin, Wakasek, Wali Kelas
-    if (isAdmin || isWakasek || isWali) {
-        let titleSiswa = (!isAdmin && !isWakasek && isWali) ? `Kelola Siswa (${kelasAsuhan})` : 'Kelola Data Siswa';
+    // MENU KELOLA SISWA: Hanya untuk Admin dan Wali Kelas (Wakasek dihapus dari sini)
+    if (isAdmin || isWali) {
+        let titleSiswa = (!isAdmin && isWali) ? `Kelola Siswa (${kelasAsuhan})` : 'Kelola Data Siswa';
         html += `
         <button onclick="window.switchMenu('admin-import')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
             <i class="ph ph-users text-xl group-hover:text-yellow-400 transition-colors"></i> ${titleSiswa}
