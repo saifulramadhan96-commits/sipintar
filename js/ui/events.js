@@ -7,7 +7,7 @@ import {
     getDisplayData, selClass, selSubject, setSearchQuery, selClassRekap 
 } from './tables.js';
 import { doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getGradesCollection } from '../config/firebase.js';
+import { db, getGradesCollection } from '../config/firebase.js';
 import { writeLog } from '../services/audit.js';
 
 export function setupUIEvents() {
