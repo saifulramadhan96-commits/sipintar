@@ -21,12 +21,12 @@ export function buildSidebarNav() {
     const user = getAppUser();
     if (!nav || !user) return;
 
-    // Ambil data dari akun yang sedang login
+    // Ambil data peran dan tugas dari akun yang sedang login
     const role = (user.role || 'guru').toLowerCase();
     const tugas = user.tugasTambahan || user.jabatan || '';
     const kelasAsuhan = user.waliKelas || '';
 
-    // PERKETAT LOGIKA AKSES (Pastikan Wakasek BUKANLAH Admin)
+    // LOGIKA HAK AKSES
     const isAdmin = role === 'admin';
     const isWakasek = (tugas === 'Wakasek Kurikulum' || role === 'wakasek') && !isAdmin;
     const isWali = tugas === 'Wali Kelas' && !isAdmin;
@@ -37,7 +37,8 @@ export function buildSidebarNav() {
         </button>
     `;
 
-    // MENU INPUT NILAI: Guru Biasa, Wali Kelas, Wakasek (TIDAK BOLEH ADMIN)
+    // 1. MENU INPUT DATA NILAI
+    // Terbuka untuk Guru, Wali Kelas, dan Wakasek (TIDAK untuk Admin)
     if (!isAdmin) {
         html += `
         <button onclick="window.switchMenu('nilai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
@@ -45,29 +46,26 @@ export function buildSidebarNav() {
         </button>`;
     }
 
-    // MENU REKAP NILAI (LEDGER): Boleh dilihat Admin, Wakasek, dan Wali Kelas
+    // 2. MENU REKAPITULASI NILAI (LEDGER)
+    // Terbuka untuk Admin, Wakasek, dan Wali Kelas
     if (isAdmin || isWakasek || isWali) {
-        let titleRekap = (!isAdmin && !isWakasek && isWali) ? `Rekap Nilai (${kelasAsuhan})` : 'Rekapitulasi Nilai';
+        let titleRekap = (isWali && !isAdmin && !isWakasek) ? `Rekap Nilai (${kelasAsuhan})` : 'Rekapitulasi Nilai';
         html += `
         <button onclick="window.switchMenu('rekap')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
             <i class="ph ph-table text-xl group-hover:text-emerald-400 transition-colors"></i> ${titleRekap}
         </button>`;
     }
 
-    // MENU KELOLA SISWA: HANYA ADMIN & WALI KELAS (WAKASEK TIDAK MASUK DI SINI)
-    if (isAdmin || isWali) {
-        let titleSiswa = (!isAdmin && isWali) ? `Kelola Siswa (${kelasAsuhan})` : 'Kelola Data Siswa';
-        html += `
-        <button onclick="window.switchMenu('admin-import')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
-            <i class="ph ph-users text-xl group-hover:text-yellow-400 transition-colors"></i> ${titleSiswa}
-        </button>`;
-    }
-
-    // MENU ADMINISTRATOR: HANYA ADMIN
+    // 3. MENU ADMINISTRATOR & KELOLA DATA SISWA
+    // HANYA muncul jika role adalah 'admin'
     if (isAdmin) {
         html += `
+        <button onclick="window.switchMenu('admin-import')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
+            <i class="ph ph-users text-xl group-hover:text-yellow-400 transition-colors"></i> Kelola Data Siswa
+        </button>
+
         <div class="my-4 border-t border-blue-800/50"></div>
-        <p class="px-4 text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">Administrator</p>
+        <p class="px-4 text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">Pengaturan Sistem</p>
         
         <button onclick="window.switchMenu('admin-master')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left">
             <i class="ph ph-database text-xl group-hover:text-purple-400 transition-colors"></i> Master Data
