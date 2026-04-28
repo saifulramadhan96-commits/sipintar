@@ -7,13 +7,15 @@ import { getFirestore, collection } from "https://www.gstatic.com/firebasejs/11.
 // --- KONFIGURASI FIREBASE ---
 const isCanvasEnv = typeof __firebase_config !== 'undefined';
 const firebaseConfig = {
-  apiKey: "AIzaSyBy4XjK7_GgwvyZszuooaHWuF_zCKpniXk",
-  authDomain: "sipintar-f7b13.firebaseapp.com",
-  projectId: "sipintar-f7b13",
-  storageBucket: "sipintar-f7b13.firebasestorage.app",
-  messagingSenderId: "86493439132",
-  appId: "1:86493439132:web:ad4786f5931aa277abf959"
+  apiKey: "AIzaSyD_rW1SrLEMxMPcdN124OVpouLk0wUJmaQ",
+  authDomain: "sipintar-ambunten.firebaseapp.com",
+  projectId: "sipintar-ambunten",
+  storageBucket: "sipintar-ambunten.firebasestorage.app",
+  messagingSenderId: "560048609348",
+  appId: "1:560048609348:web:2f71b21b38b7d6a2dcc411",
+  measurementId: "G-J1SLD3313Y"
 };
+
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : "sipintar-sman1ambunten";
 
