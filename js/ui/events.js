@@ -40,8 +40,13 @@ export function setupUIEvents() {
     if(fMapel) fMapel.onchange = updateFilters;
     if(fKelas) fKelas.onchange = updateFilters;
 
-    const btnSaveWeights = document.getElementById('btn-save-weights');
+   const btnSaveWeights = document.getElementById('btn-save-weights');
     if (btnSaveWeights) {
+        // Tampilkan nilai bobot terakhir ke dalam form input
+        document.getElementById('w-f').value = weights.f;
+        document.getElementById('w-t').value = weights.t;
+        document.getElementById('w-a').value = weights.a;
+
         btnSaveWeights.addEventListener('click', () => {
             const wf = parseFloat(document.getElementById('w-f').value) || 0;
             const wt = parseFloat(document.getElementById('w-t').value) || 0;
@@ -57,9 +62,12 @@ export function setupUIEvents() {
             weights.f = wf;
             weights.t = wt;
             weights.a = wa;
-            renderTable();
             
-            alert('Pengaturan bobot berhasil diterapkan untuk perhitungan!');
+            // SIMPAN PERMANEN KE BROWSER
+            localStorage.setItem('sipintar_weights', JSON.stringify(weights));
+            
+            renderTable();
+            alert('Pengaturan bobot berhasil diterapkan dan disimpan untuk sesi berikutnya!');
         });
     }
 
