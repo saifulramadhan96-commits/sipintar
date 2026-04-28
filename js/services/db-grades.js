@@ -10,7 +10,9 @@ import { writeLog } from './audit.js';
 // State untuk Nilai
 export let gradesData = [];
 export let unsubGrades = null;
-export let weights = { f: 25, t: 25, a: 50 }; // Default bobot
+// Baca dari memori browser, jika kosong gunakan default
+const savedWeights = JSON.parse(localStorage.getItem('sipintar_weights'));
+export let weights = savedWeights || { f: 25, t: 25, a: 50 };
 
 // Fungsi Kalkulasi Nilai
 export function getCalc(s) {
