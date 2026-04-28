@@ -21,13 +21,15 @@ export function buildSidebarNav() {
     const user = getAppUser();
     if (!nav || !user) return;
 
-    const role = user.role || 'guru';
+    // Ambil data dari akun yang sedang login
+    const role = (user.role || 'guru').toLowerCase();
     const tugas = user.tugasTambahan || user.jabatan || '';
     const kelasAsuhan = user.waliKelas || '';
 
-    const isWali = tugas === 'Wali Kelas';
-    const isWakasek = tugas === 'Wakasek Kurikulum' || role === 'wakasek';
+    // PERKETAT LOGIKA AKSES (Pastikan Wakasek BUKANLAH Admin)
     const isAdmin = role === 'admin';
+    const isWakasek = (tugas === 'Wakasek Kurikulum' || role === 'wakasek') && !isAdmin;
+    const isWali = tugas === 'Wali Kelas' && !isAdmin;
 
     let html = `
         <button onclick="window.switchMenu('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left">
@@ -35,8 +37,7 @@ export function buildSidebarNav() {
         </button>
     `;
 
-    // MENU INPUT NILAI: Terbuka untuk Guru, Wali Kelas, Wakasek (TETAPI DITUTUP UNTUK ADMIN)
-    // Catatan: Wakasek tetap melihat menu ini agar bisa memasukkan nilai untuk mapel yang ia ajar
+    // MENU INPUT NILAI: Guru Biasa, Wali Kelas, Wakasek (TIDAK BOLEH ADMIN)
     if (!isAdmin) {
         html += `
         <button onclick="window.switchMenu('nilai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-blue-100 hover:bg-blue-800 hover:text-white transition-all font-medium group text-left mt-1">
@@ -44,7 +45,7 @@ export function buildSidebarNav() {
         </button>`;
     }
 
-    // MENU REKAP NILAI (LEDGER): Terbuka untuk Admin, Wakasek, dan Wali Kelas
+    // MENU REKAP NILAI (LEDGER): Boleh dilihat Admin, Wakasek, dan Wali Kelas
     if (isAdmin || isWakasek || isWali) {
         let titleRekap = (!isAdmin && !isWakasek && isWali) ? `Rekap Nilai (${kelasAsuhan})` : 'Rekapitulasi Nilai';
         html += `
@@ -53,7 +54,7 @@ export function buildSidebarNav() {
         </button>`;
     }
 
-    // MENU KELOLA SISWA: Hanya untuk Admin dan Wali Kelas (Wakasek dihapus dari sini)
+    // MENU KELOLA SISWA: HANYA ADMIN & WALI KELAS (WAKASEK TIDAK MASUK DI SINI)
     if (isAdmin || isWali) {
         let titleSiswa = (!isAdmin && isWali) ? `Kelola Siswa (${kelasAsuhan})` : 'Kelola Data Siswa';
         html += `
@@ -62,7 +63,7 @@ export function buildSidebarNav() {
         </button>`;
     }
 
-    // MENU KHUSUS ADMIN
+    // MENU ADMINISTRATOR: HANYA ADMIN
     if (isAdmin) {
         html += `
         <div class="my-4 border-t border-blue-800/50"></div>
