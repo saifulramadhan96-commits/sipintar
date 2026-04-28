@@ -6,8 +6,8 @@ import {
     setFilters, renderTable, gradesData, setEditGradeId, editGradeId, 
     getDisplayData, selClass, selSubject, setSearchQuery, selClassRekap 
 } from './tables.js';
-import { doc, updateDoc, deleteDoc, serverTimestamp, getDoc, setDoc, db } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getGradesCollection } from '../config/firebase.js';
+import { doc, updateDoc, deleteDoc, serverTimestamp, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { db, getGradesCollection } from '../config/firebase.js';
 import { writeLog } from '../services/audit.js';
 
 export function setupUIEvents() {
