@@ -103,7 +103,11 @@ export function initLoginForm(onLoginSuccess) {
 }
 
 export function handleLogout(onLogoutComplete) {
-    localStorage.clear();
+    // Hapus sesi login spesifik saja, JANGAN pakai clear() agar bobot nilai tidak terhapus
+    localStorage.removeItem('sipintar_user');
+    localStorage.removeItem('sipintar_tahun');
+    localStorage.removeItem('sipintar_semester');
+    
     appUser = null;
     if (onLogoutComplete) onLogoutComplete();
     window.location.reload(); // Refresh total agar aman
