@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Si PINTAR SMAN 1 Ambunten</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* ========================================================
+       PENGATURAN CETAK (PRINT PREVIEW) SUPER BERSIH
+       ======================================================== */
+    @media print {
+      /* Sembunyikan semua interface web (Sidebar, Dashboard, Background) */
+      body > *:not(#preview-modal) { display: none !important; }
+      
+      /* Jadikan Modal Preview sebagai satu-satunya Halaman Root */
+      #preview-modal { 
+        display: block !important; 
+        position: static !important; 
+        background: white !important; 
+        height: auto !important; 
+        overflow: visible !important; 
+      }
+      
+      /* Hilangkan toolbar, tombol, dan kop layar di dalam modal */
+      .print-hidden, .screen-kop { display: none !important; }
+      
+      /* TAMPILKAN KOP CETAK (DENGAN LOGO) */
+      .print-kop { display: flex !important; }
+      
+      /* Paksa semua teks menjadi HITAM (Menghemat tinta warna & terlihat resmi) */
+      * { color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      
+      /* Format Tabel Dokumen Resmi */
+      table { page-break-inside: auto; border-collapse: collapse !important; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      
+      /* Set Margin Kertas A4 */
+      @page { size: A4 portrait; margin: 1.5cm; }
+    }
+    
+    .bg-pattern {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.2) 2px, transparent 2px);
+      background-size: 30px 30px;
+    }
+  </style>
+</head>
+<body class="font-sans bg-gray-50 text-gray-800 antialiased min-h-screen flex flex-col md:flex-row print:bg-white relative">
+
+  <div id="debug-wrapper" class="fixed bottom-4 left-4 z-[9999] print-hidden flex flex-col items-start gap-2">
+    <button id="btn-toggle-debug" class="bg-black/80 text-green-400 text-[10px] font-mono px-3 py-1.5 rounded border border-green-500/50 hover:bg-black transition-colors flex items-center gap-2">
+      <div id="debug-status-dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> DEBUG LOG
+    </button>
+    <div id="debug-panel" class="hidden bg-black/90 text-green-400 font-mono text-[10px] sm:text-xs p-3 rounded-lg border border-green-500/30 w-[90vw] sm:w-96 max-h-48 overflow-y-auto shadow-2xl backdrop-blur-sm">
+      <div class="border-b border-green-500/30 pb-1 mb-2 font-bold text-green-300">DIAGNOSTIK DATABASE</div><div id="debug-content" class="space-y-1.5"></div>
+    </div>
+  </div>
+
+  <div id="login-view" class="min-h-screen w-full bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4 absolute inset-0 z-40 print-hidden">
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-white/50 backdrop-blur-sm">
+      <div class="bg-gradient-to-b from-blue-700 to-blue-800 p-10 text-center relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-full bg-pattern opacity-10"></div>
+        <img src="https://i.ibb.co.com/PvMwpFTg/LOGO-SMANIA.jpg" alt="LOGO" class="w-28 h-28 mx-auto mb-6 rounded-full bg-white object-contain p-1 border-4 border-yellow-400 shadow-xl relative z-10">
+        <h1 class="text-3xl font-extrabold text-white relative z-10 tracking-tight">Si PINTAR</h1>
+        <p class="text-blue-100 mt-2 text-sm font-medium relative z-10">Sistem Pusat Informasi Terpadu<br>Administrasi Rapor</p>
+      </div>
+      <form id="login-form" class="p-8 space-y-6">
+        <div class="space-y-2"><label class="text-sm font-bold text-gray-700 ml-1">Akun Pengguna</label><div class="relative group"><i class="ph ph-user absolute left-4 top-3.5 text-gray-400 text-xl group-focus-within:text-blue-600 transition-colors"></i><input type="text" id="login-username" list="users-list" placeholder="Nama Lengkap / Username" required class="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-all font-medium outline-none"><datalist id="users-list"></datalist></div></div>
+        <div class="space-y-2"><label class="text-sm font-bold text-gray-700 ml-1">Kata Sandi</label><div class="relative group"><i class="ph ph-lock absolute left-4 top-3.5 text-gray-400 text-xl group-focus-within:text-blue-600 transition-colors"></i><input type="password" id="login-password" placeholder="••••••••" required class="w-full pl-12 pr-12 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-all font-medium outline-none"><button type="button" id="toggle-password" class="absolute right-4 top-3.5 text-gray-400 hover:text-blue-600 transition-colors focus:outline-none text-xl"><i class="ph ph-eye"></i></button></div></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div class="space-y-2"><label class="text-sm font-bold text-gray-700 ml-1">Tahun Pelajaran</label><select id="login-tahun" required class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-all font-medium outline-none"></select></div><div class="space-y-2"><label class="text-sm font-bold text-gray-700 ml-1">Semester</label><select id="login-semester" required class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-all font-medium outline-none"><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select></div></div>
+        <div id="login-error" class="hidden p-4 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 flex items-start"><i class="ph ph-warning-circle text-2xl mr-3 flex-shrink-0 mt-0.5"></i><span id="login-error-text" class="leading-tight block"></span></div>
+        <button type="submit" id="btn-login-submit" disabled class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-blue-900 font-extrabold py-3.5 rounded-xl transition-all shadow-lg text-lg opacity-50 cursor-not-allowed">MEMUAT DATABASE...</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="main-view" class="hidden w-full min-h-screen flex flex-col md:flex-row print:bg-white relative">
+    
+    <div class="md:hidden bg-blue-800 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg print-hidden">
+      <div class="flex items-center gap-3"><i class="ph ph-buildings text-yellow-400 text-2xl"></i><span class="font-bold text-lg">Si PINTAR</span></div>
+      <button id="btn-mobile-menu" class="p-2 hover:bg-blue-700 rounded-lg text-2xl"><i class="ph ph-list"></i></button>
+    </div>
+
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-sm print-hidden"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-blue-900 text-white transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0 print-hidden shadow-2xl flex flex-col">
+      <div class="p-8 flex flex-col items-center bg-blue-950">
+        <div class="bg-white p-1.5 rounded-full mb-4 ring-4 ring-blue-800"><img src="https://i.ibb.co.com/PvMwpFTg/LOGO-SMANIA.jpg" alt="LOGO" class="w-16 h-16 rounded-full object-cover"></div>
+        <h2 class="text-xl font-bold text-white tracking-wide uppercase">Si PINTAR</h2>
+      </div>
+      <nav class="flex-1 p-4 space-y-2 overflow-y-auto" id="sidebar-nav"></nav>
+      <div class="p-4 bg-blue-950 border-t border-blue-900">
+        <div class="flex items-center gap-3 mb-4 px-2"><div class="bg-blue-800 p-2 rounded-lg text-yellow-400 text-xl"><i class="ph ph-user"></i></div><div class="overflow-hidden"><p id="auth-user-name" class="text-sm font-semibold truncate text-white"></p><p id="auth-user-role" class="text-[10px] text-blue-300 uppercase font-bold tracking-wider"></p></div></div>
+        <button id="btn-logout" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-medium transition-all shadow-md"><i class="ph ph-sign-out text-lg"></i> Keluar Sistem</button>
+      </div>
+    </aside>
+
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto print:p-0 bg-gray-50 relative" id="main-content">
+      
+      <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print-hidden">
+        <div>
+          <h1 id="page-title" class="text-3xl font-extrabold text-gray-800 flex items-center gap-3">Dashboard Utama</h1>
+          <p class="text-gray-500 font-medium mt-1">Selamat datang kembali, <span id="page-subtitle-name" class="text-blue-700 font-bold"></span></p>
+          <div id="display-periode" class="mt-2 text-xs font-bold text-blue-800 bg-blue-100 px-3 py-1.5 rounded-full inline-block"></div>
+        </div>
+        <div class="hidden md:block text-right"><div id="current-date" class="text-sm font-bold text-gray-400 uppercase tracking-wide"></div></div>
+      </header>
+
+      <div id="sec-dashboard" class="section-container space-y-8">
+        <div class="bg-gradient-to-r from-blue-800 to-blue-600 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden group">
+          <div class="relative z-10 max-w-2xl">
+            <h2 class="text-4xl font-bold mb-4">Halo, <span id="dash-name"></span>! 👋</h2>
+            <p id="dash-desc" class="text-blue-100 text-lg mb-8 leading-relaxed"></p>
+            <button id="dash-action-btn" class="bg-yellow-400 text-blue-900 px-6 py-3 rounded-xl font-bold hover:bg-yellow-300 transition-all shadow-lg flex items-center gap-2 transform hover:-translate-y-1"></button>
+          </div>
+          <div class="absolute right-0 bottom-0 opacity-10 transform translate-x-20 translate-y-20 text-[400px] leading-none"><i class="ph ph-buildings"></i></div>
+        </div>
+
+        <div id="dashboard-filter-bar" class="bg-white p-4 rounded-xl border-l-8 border-l-blue-600 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4 hidden">
+            <div class="font-bold text-gray-700 text-sm flex items-center gap-2"><i class="ph ph-clock-counter-clockwise text-blue-600 text-xl"></i> Histori Periode:</div>
+            <select id="dash-filter-tahun" class="border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-gray-50 flex-1 sm:flex-none"></select>
+            <select id="dash-filter-smt" class="border border-gray-300 rounded-lg p-2.5 text-sm outline-none bg-gray-50 flex-1 sm:flex-none"><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select>
+            <button id="btn-apply-dash-filter" class="w-full sm:w-auto bg-gray-800 hover:bg-black text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm">Terapkan Filter</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white rounded-xl p-6 border-l-8 border-l-blue-500 shadow-sm hover:shadow-xl transition-all group">
+            <div class="flex justify-between items-start">
+              <div><p class="text-gray-500 font-semibold mb-1 uppercase text-xs tracking-wider">Total Data Siswa</p><h3 id="stat-students" class="text-4xl font-extrabold text-gray-800 group-hover:text-blue-600">0</h3></div>
+              <div class="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors text-3xl"><i class="ph ph-users"></i></div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl p-6 border-l-8 border-l-emerald-500 shadow-sm hover:shadow-xl transition-all group">
+            <div class="flex justify-between items-start">
+              <div><p class="text-gray-500 font-semibold mb-1 uppercase text-xs tracking-wider">Rata-rata Nilai</p><h3 id="stat-avg" class="text-4xl font-extrabold text-gray-800 group-hover:text-emerald-600">0.0</h3></div>
+              <div class="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-colors text-3xl"><i class="ph ph-trend-up"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="bg-white rounded-xl p-6 border-t-4 border-t-blue-500 shadow-sm"><h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="ph ph-chart-bar text-blue-600 text-xl"></i> Sebaran Capaian Kompetensi</h3><div class="h-64 w-full relative"><canvas id="gradeDistributionChart"></canvas></div></div>
+            <div class="bg-white rounded-xl p-6 border-t-4 border-t-yellow-400 shadow-sm"><h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="ph ph-info text-blue-600 text-xl"></i> Panduan Penggunaan</h3><div id="user-manual-content" class="text-sm text-gray-600 space-y-3"></div></div>
+        </div>
+      </div>
+
+      <div id="sec-nilai" class="section-container hidden space-y-6">
+        <div class="bg-white rounded-xl p-5 border shadow-sm print-hidden" id="filter-container">
+          <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><i class="ph ph-funnel text-blue-600"></i> Pengaturan Tabel Input</h3>
+          <div class="grid md:grid-cols-3 gap-4" id="filter-grid">
+            <div id="filter-guru-wrapper"><label class="block text-xs font-semibold text-gray-500 mb-1">Guru Mata Pelajaran</label><select id="filter-guru" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"><option value="all">Semua Guru</option></select></div>
+            <div><label class="block text-xs font-semibold text-gray-500 mb-1">Mata Pelajaran</label><select id="filter-mapel" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"></select></div>
+            <div><label class="block text-xs font-semibold text-gray-500 mb-1">Kelas</label><select id="filter-kelas" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"></select></div>
+          </div>
+        </div>
+        
+        <div id="empty-state-nilai" class="flex flex-col items-center justify-center py-20 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-400 print-hidden">
+          <div class="bg-yellow-50 p-6 rounded-full mb-4 animate-bounce"><i class="ph ph-funnel text-5xl text-yellow-400"></i></div><p class="text-xl font-bold text-gray-600">Mulai Dengan Memilih Kelas & Mapel</p>
+        </div>
+
+        <div id="table-container" class="bg-white rounded-xl shadow-sm overflow-hidden hidden print-shadow-none print-border-none border">
+          <div class="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between gap-4 print-hidden items-start md:items-center">
+            
+            <div class="flex flex-wrap items-center gap-3">
+              <span id="badge-guru" class="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 hidden"></span>
+              <span id="badge-kelas" class="px-2 py-1 rounded-md text-xs font-medium bg-yellow-400 text-blue-900 font-bold shadow-sm"></span>
+              <span id="badge-mapel" class="font-semibold text-gray-800 text-lg"></span>
+              <span id="badge-edit-mode" class="ml-2 text-xs font-normal text-amber-800 bg-amber-100 px-2 py-1 rounded-full border border-amber-200 hidden">Mode Edit</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 print-hidden">
+              <button id="btn-cancel-edit" class="text-xs text-red-600 hover:underline flex items-center gap-1 mr-2 hidden"><i class="ph ph-x"></i> Batal Edit</button>
+              <div id="guru-excel-actions" class="hidden flex items-center gap-2 mr-2 border-r pr-3">
+                <button id="btn-template-nilai" class="text-xs bg-white hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md font-medium border flex items-center gap-1"><i class="ph ph-download-simple text-blue-600"></i> Format</button>
+                <div class="relative"><input type="file" id="import-xlsx-nilai" accept=".xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"><button class="text-xs bg-white hover:bg-emerald-50 text-gray-700 px-3 py-1.5 rounded-md font-medium border flex items-center gap-1"><i class="ph ph-upload-simple text-emerald-600"></i> Import</button></div>
+              </div>
+              
+              <button onclick="window.openPreviewModal('nilai')" class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-all shadow-sm">
+                <i class="ph ph-printer"></i> Cetak Preview
+              </button>
+
+              <button id="btn-export-excel" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-medium transition-all shadow-sm">
+                <i class="ph ph-file-xls"></i> Export Excel
+              </button>
+            </div>
+          </div>
+
+          <div id="weights-container" class="bg-blue-50 p-3 mx-4 mt-4 rounded-lg border border-blue-100 flex flex-wrap gap-4 items-center hidden print-hidden">
+            <div class="text-xs font-bold text-blue-800 flex items-center gap-1"><i class="ph ph-percent"></i> Atur Bobot (%):</div>
+            <div class="flex items-center gap-2"><label class="text-xs text-gray-600">Formatif</label><input type="number" id="w-f" class="w-12 text-center text-xs border rounded p-1" value="25"></div>
+            <div class="flex items-center gap-2"><label class="text-xs text-gray-600">Tugas</label><input type="number" id="w-t" class="w-12 text-center text-xs border rounded p-1" value="25"></div>
+            <div class="flex items-center gap-2"><label class="text-xs text-gray-600">ASAJ</label><input type="number" id="w-a" class="w-12 text-center text-xs border rounded p-1" value="50"></div>
+          </div>
+
+          <div class="overflow-x-auto p-4 print-hidden">
+            <form id="grade-form">
+              <table class="w-full text-sm text-left">
+                <thead class="bg-blue-100 text-blue-900 border-b border-blue-200 font-bold">
+                  <tr>
+                    <th class="px-4 py-3 w-10">No</th><th class="px-4 py-3 min-w-[200px]">Nama Siswa & NISN</th>
+                    <th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">F1</th><th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">F2</th><th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">F3</th>
+                    <th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">T1</th><th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">T2</th><th class="px-2 py-3 text-center min-w-[50px] guru-col hidden">T3</th>
+                    <th class="px-2 py-3 text-center min-w-[60px] guru-col hidden">ASAJ</th><th class="px-4 py-3 text-center bg-blue-50/50 text-blue-800 min-w-[60px]">NA</th><th class="px-4 py-3 text-right w-24 print-hidden guru-col hidden">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="grades-tbody" class="divide-y divide-gray-100">
+                  <tr id="row-new-grade" class="bg-yellow-50 border-b border-yellow-200 print-hidden hidden">
+                    <td class="px-4 py-3 text-center font-bold text-yellow-600" id="icon-new-edit">+</td>
+                    <td class="px-4 py-3"><div class="space-y-1"><input type="text" id="in-name" placeholder="Nama Lengkap" required class="w-full border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"><input type="text" id="in-nisn" placeholder="NISN" class="w-full border rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500"></div></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-f1" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-f2" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-f3" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-t1" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-t2" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-t3" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500"></td>
+                    <td class="px-2 py-3"><input type="number" min="0" max="100" id="in-asaj" class="in-score w-full border rounded px-1 py-1 text-center text-sm outline-none focus:border-blue-500 font-bold text-emerald-700 bg-emerald-50"></td>
+                    <td class="px-4 py-3 text-center font-bold text-blue-700 bg-blue-100/50" id="in-na">0.0</td>
+                    <td class="px-4 py-3 text-right"><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded shadow-sm transition-colors" title="Simpan Data"><i class="ph ph-floppy-disk text-lg"></i></button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-rekap" class="section-container hidden space-y-6">
+        <div class="bg-white rounded-xl p-5 border shadow-sm print-hidden" id="filter-rekap-container">
+          <div class="flex flex-col md:flex-row justify-between md:items-end gap-4">
+             <div class="w-full md:w-64">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Pilih Kelas Asuhan</label>
+                <select id="filter-kelas-rekap" onchange="window.updateFilterRekap(this.value)" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50 font-bold text-blue-900 cursor-pointer"></select>
+             </div>
+             
+             <div class="flex items-center gap-2">
+                 <button onclick="window.openPreviewModal('rekap')" class="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition-all"><i class="ph ph-printer text-xl"></i> Cetak Ledger</button>
+                 <button onclick="window.exportRekapExcel()" class="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md transition-all transform hover:-translate-y-0.5"><i class="ph ph-file-xls text-xl"></i> Unduh Ledger (Excel)</button>
+             </div>
+          </div>
+        </div>
+
+        <div id="empty-state-rekap" class="flex flex-col items-center justify-center py-20 bg-white border-2 border-dashed border-gray-200 rounded-xl text-gray-400 print-hidden">
+          <div class="bg-blue-50 p-6 rounded-full mb-4 animate-bounce"><i class="ph ph-table text-5xl text-blue-400"></i></div>
+          <p class="text-xl font-bold text-gray-600">Pilih Kelas Untuk Melihat Ledger Nilai</p>
+        </div>
+
+        <div id="table-rekap-container" class="bg-white rounded-xl shadow-xl overflow-hidden hidden print-hidden border">
+          <div class="p-4 bg-gradient-to-r from-blue-900 to-blue-800 text-white border-b border-blue-950 flex justify-between items-center">
+             <h2 class="text-lg font-extrabold flex items-center gap-2 uppercase tracking-tight"><i class="ph ph-table text-2xl text-yellow-400"></i> Ledger Rekapitulasi Nilai Akademik</h2>
+             <div class="bg-blue-950 px-3 py-1 rounded-md border border-blue-700"><span class="text-xs text-blue-300 mr-1">KELAS:</span><span id="badge-kelas-rekap" class="font-bold text-yellow-400"></span></div>
+          </div>
+          <div class="p-2 overflow-x-auto">
+             <table class="w-full text-sm text-left border-collapse">
+                <thead id="rekap-thead" class="bg-gray-100 text-gray-700 font-extrabold border-b-2 border-gray-300"></thead>
+                <tbody id="rekap-tbody" class="divide-y divide-gray-200 bg-white"></tbody>
+             </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-admin-import" class="section-container hidden space-y-6 max-w-5xl mx-auto print-hidden">
+        <div class="bg-white rounded-xl p-8 border-t-8 border-t-yellow-400 shadow-sm">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center text-yellow-600 text-2xl"><i class="ph ph-users"></i></div>
+            <div><h2 class="text-2xl font-bold text-gray-800">Kelola Data Siswa</h2></div>
+          </div>
+          
+          <div class="bg-blue-50 p-6 rounded-xl border border-blue-200 mb-6 relative overflow-hidden">
+            <div class="absolute right-0 top-0 opacity-10 text-[100px] transform translate-x-4 -translate-y-4"><i class="ph ph-arrow-circle-up-right"></i></div>
+            <h3 class="font-extrabold text-blue-900 mb-4 flex items-center gap-2 relative z-10"><i class="ph ph-copy"></i> Fitur Naik Kelas / Salin Siswa</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative z-10">
+              <div><label class="block text-xs font-bold text-blue-800 mb-1">Tahun Ajaran Asal</label><select id="copy-tahun-asal" class="w-full border border-blue-300 rounded-lg p-2.5 text-sm outline-none"></select></div>
+              <div><label class="block text-xs font-bold text-blue-800 mb-1">Kelas Asal</label><select id="copy-class-asal" class="w-full border border-blue-300 rounded-lg p-2.5 text-sm outline-none"></select></div>
+              <div><label class="block text-xs font-bold text-blue-800 mb-1">Kelas Tujuan (Periode Aktif)</label><select id="copy-class-tujuan" class="w-full border border-blue-300 rounded-lg p-2.5 text-sm outline-none"></select></div>
+              <div><button id="btn-copy-siswa" class="w-full bg-blue-600 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm flex justify-center items-center gap-2 shadow-md"><i class="ph ph-arrow-circle-right text-lg"></i> Proses Salin</button></div>
+            </div>
+            <p class="text-[11px] font-medium text-blue-700 mt-3 relative z-10">*Siswa akan disalin ke periode aktif.</p>
+          </div>
+
+          <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8 flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex-1 w-full">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Pilih Kelas (Untuk Import / Tambah)</label>
+              <select id="import-class-select" class="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-yellow-400"></select>
+              <button id="btn-template-siswa" class="mt-3 w-full bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium py-2 rounded-lg text-sm flex justify-center items-center gap-2 shadow-sm"><i class="ph ph-download-simple text-lg"></i> Download Format</button>
+            </div>
+            <div class="flex-1 w-full flex flex-col gap-2">
+              <div class="relative w-full h-full min-h-[100px]">
+                <input type="file" id="import-xlsx-siswa" accept=".xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                <div class="h-full bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 text-center flex flex-col items-center justify-center">
+                  <i class="ph ph-file-xls text-3xl mb-1 text-emerald-600"></i><span class="text-sm font-semibold text-emerald-700" id="label-xlsx-siswa">Pilih File Siswa (.xlsx)</span>
+                </div>
+              </div>
+              <button id="btn-process-siswa" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm hidden flex items-center justify-center gap-2 shadow-md"><i class="ph ph-check-circle text-lg"></i> Simpan & Proses Siswa</button>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-end mb-4">
+            <div class="w-64"><label class="block text-xs font-semibold text-gray-500 mb-1">Filter List Siswa:</label><select id="crud-siswa-kelas-filter" class="w-full border rounded-lg p-2 outline-none bg-white"></select></div>
+          </div>
+          <div class="overflow-x-auto border rounded-lg">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-gray-100 text-gray-700 font-bold border-b"><tr><th class="px-4 py-3 w-16 text-center">No</th><th class="px-4 py-3">Nama Siswa</th><th class="px-4 py-3">NISN</th><th class="px-4 py-3 text-center">Kelas</th><th class="px-4 py-3 text-right">Aksi</th></tr></thead>
+              <tbody id="crud-siswa-tbody" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-admin-guru" class="section-container hidden space-y-6 max-w-5xl mx-auto print-hidden">
+        <div class="bg-white rounded-xl p-8 border-t-8 border-t-blue-500 shadow-sm">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center text-blue-600 text-2xl"><i class="ph ph-users-three"></i></div>
+            <div><h2 class="text-2xl font-bold text-gray-800">Kelola Pengguna Aplikasi</h2><p class="text-sm text-gray-500 mt-1">Tambah guru baru dan atur tugas tambahan (Wali Kelas / Wakasek).</p></div>
+          </div>
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-gray-50 p-4 rounded-xl border">
+            <button id="btn-add-guru" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex justify-center items-center gap-2 shadow-md"><i class="ph ph-user-plus text-lg"></i> Tambah Pengguna Baru</button>
+            <button id="btn-template-guru" class="w-full sm:w-auto bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium py-2.5 px-5 rounded-lg text-sm flex justify-center items-center gap-2 transition-colors"><i class="ph ph-download-simple text-lg"></i> Unduh Data Excel</button>
+          </div>
+          <div class="overflow-x-auto border rounded-lg">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-gray-100 text-gray-700 font-bold border-b"><tr><th class="px-4 py-3 w-16 text-center">No</th><th class="px-4 py-3">Nama Pengguna</th><th class="px-4 py-3">Role & Jabatan</th><th class="px-4 py-3">Password</th><th class="px-4 py-3 text-right">Aksi</th></tr></thead>
+              <tbody id="crud-guru-tbody" class="divide-y divide-gray-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-admin-master" class="section-container hidden space-y-6 max-w-5xl mx-auto print-hidden">
+        <div class="bg-white rounded-xl p-8 border-t-8 border-t-purple-500 shadow-sm">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center text-purple-600 text-2xl"><i class="ph ph-database"></i></div>
+            <div><h2 class="text-2xl font-bold text-gray-800">Kelola Master Data</h2></div>
+          </div>
+          <div class="bg-purple-50 p-6 rounded-xl border border-purple-200 mb-8 flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex-1 w-full"><h3 class="font-bold text-purple-900 mb-2 flex items-center gap-2"><i class="ph ph-file-xls text-xl"></i> Import Master Data Masal</h3><button id="btn-template-master" class="w-full bg-white border border-purple-300 hover:bg-purple-100 text-purple-800 font-bold py-2.5 rounded-lg text-sm flex justify-center items-center gap-2 shadow-sm"><i class="ph ph-download-simple text-lg"></i> Download Format XLSX Master</button></div>
+            <div class="flex-1 w-full flex flex-col gap-2"><div class="relative w-full h-full min-h-[100px]"><input type="file" id="import-xlsx-master" accept=".xlsx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"><div class="h-full bg-white border-2 border-dashed border-purple-300 rounded-lg p-4 text-center flex flex-col items-center justify-center"><i class="ph ph-upload-simple text-3xl mb-1 text-purple-600"></i><span class="text-sm font-semibold text-purple-700" id="label-xlsx-master">Pilih File Master (.xlsx)</span></div></div><button id="btn-process-master" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-sm hidden flex items-center justify-center gap-2 shadow-md"><i class="ph ph-check-circle text-lg"></i> Simpan & Proses Data</button></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gray-50 border rounded-xl p-5"><h3 class="font-bold mb-4">Tahun Ajaran</h3><div class="flex gap-2 mb-4"><input type="text" id="in-master-tahun" placeholder="2028/2029" class="flex-1 border rounded p-2 text-sm outline-none"><button id="btn-add-master-tahun" class="bg-purple-600 text-white px-3 py-2 rounded transition-colors"><i class="ph ph-plus"></i></button></div><div id="master-tahun-list" class="max-h-64 overflow-y-auto pr-2"></div></div>
+            <div class="bg-gray-50 border rounded-xl p-5"><h3 class="font-bold mb-4">Daftar Kelas</h3><div class="flex gap-2 mb-4"><input type="text" id="in-master-class" placeholder="X-1" class="flex-1 border rounded p-2 text-sm outline-none"><button id="btn-add-master-class" class="bg-purple-600 text-white px-3 py-2 rounded transition-colors"><i class="ph ph-plus"></i></button></div><div id="master-class-list" class="max-h-64 overflow-y-auto pr-2"></div></div>
+            <div class="bg-gray-50 border rounded-xl p-5"><h3 class="font-bold mb-4">Daftar Mata Pelajaran</h3><div class="flex gap-2 mb-4"><input type="text" id="in-master-subject" placeholder="Fisika" class="flex-1 border rounded p-2 text-sm outline-none"><button id="btn-add-master-subject" class="bg-purple-600 text-white px-3 py-2 rounded transition-colors"><i class="ph ph-plus"></i></button></div><div id="master-subject-list" class="max-h-64 overflow-y-auto pr-2"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="sec-admin-backup" class="section-container hidden space-y-6 max-w-4xl mx-auto print-hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white rounded-xl p-8 border-t-8 border-t-emerald-500 shadow-sm text-center">
+            <h2 class="text-xl font-bold mb-6">Backup Data</h2>
+            <button id="btn-backup-db" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2"><i class="ph ph-database"></i> Download File JSON</button>
+          </div>
+          <div class="bg-white rounded-xl p-8 border-t-8 border-t-orange-500 shadow-sm text-center relative overflow-hidden">
+            <h2 class="text-xl font-bold mb-6">Restore Data</h2>
+            <div class="relative w-full bg-orange-600 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer">
+              <input type="file" id="import-json-restore" accept=".json" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+              <i class="ph ph-arrows-clockwise"></i> Upload File JSON
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-8 border-t-8 border-t-red-600 shadow-sm mt-6">
+            <h2 class="text-xl font-bold text-red-600 mb-6 text-center">Zona Bahaya</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-reset-siswa" class="w-full bg-red-500 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2"><i class="ph ph-users-three text-xl"></i> Kosongkan Data Siswa</button>
+                <button id="btn-reset-db" class="w-full bg-red-900 text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2"><i class="ph ph-warning-octagon text-xl"></i> Reset Total Database</button>
+            </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="preview-modal" class="fixed inset-0 bg-gray-600/90 z-[9999] hidden flex-col backdrop-blur-sm print:bg-white print:static print:inset-auto print:z-auto print:flex print:block">
+    
+    <div class="bg-blue-900 text-white p-4 flex justify-between items-center shadow-xl print-hidden">
+      <h2 class="font-bold text-lg flex items-center gap-2"><i class="ph ph-printer"></i> Preview Cetak Dokumen Resmi</h2>
+      <div class="flex gap-3">
+        <button onclick="document.getElementById('preview-modal').classList.replace('flex', 'hidden')" class="px-5 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold transition-colors shadow-md">Tutup Preview</button>
+        <button onclick="window.print()" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-md"><i class="ph ph-printer text-lg"></i> Eksekusi Cetak</button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center print:p-0 print:overflow-visible">
+      
+      <div class="bg-white w-full max-w-[21cm] min-h-[29.7cm] p-10 sm:p-12 shadow-2xl print:shadow-none print:max-w-none print:p-0 text-black">
+        
+        <div class="text-center border-b-4 border-double border-gray-800 pb-4 mb-6 screen-kop print:hidden">
+          <h3 class="font-bold text-lg uppercase tracking-wider leading-tight">Pemerintah Provinsi Jawa Timur</h3>
+          <h3 class="font-bold text-lg uppercase tracking-wider leading-tight">Dinas Pendidikan</h3>
+          <h2 class="font-extrabold text-2xl tracking-widest mt-1">SMAN 1 Ambunten</h2>
+          <p class="text-sm mt-1">Alamat: Jl. Raya Ambunten, Sumenep - Jawa Timur</p>
+        </div>
+
+        <div class="border-b-4 border-double border-black pb-4 mb-6 print-kop hidden print:flex items-center justify-between">
+          <img src="https://i.ibb.co.com/PvMwpFTg/LOGO-SMANIA.jpg" class="w-24 h-24 object-contain">
+          <div class="text-center flex-1">
+            <h3 class="font-bold text-xl uppercase tracking-wider text-black leading-tight">Pemerintah Provinsi Jawa Timur</h3>
+            <h2 class="font-extrabold text-3xl tracking-widest mt-1 text-black">SMAN 1 AMBUNTEN</h2>
+            <p class="text-sm mt-1 text-black">Jl. Raya Ambunten, Sumenep - Jawa Timur</p>
+          </div>
+          <div class="w-24"></div> </div>
+
+        <div class="text-center mb-6">
+          <h4 id="preview-doc-title" class="font-extrabold text-lg uppercase underline mb-2">Daftar Capaian Akademik</h4>
+          <div id="preview-doc-subtitle" class="text-sm flex flex-wrap justify-center gap-x-4 gap-y-1 font-medium"></div>
+        </div>
+
+        <div id="preview-table-container" class="w-full text-sm mb-10 overflow-x-auto print:overflow-visible"></div>
+
+        <div class="flex justify-end mt-12 pr-8 print:pr-4 break-inside-avoid">
+          <div class="text-center w-64">
+            <p>Ambunten, <span id="preview-date"></span></p>
+            <p id="preview-ttd-role" class="mb-20">Guru Mata Pelajaran</p>
+            <p id="preview-ttd-name" class="font-bold underline uppercase tracking-wide"></p>
+            <p id="preview-ttd-nip" class="text-sm">NIP. -</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
