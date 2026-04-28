@@ -40,9 +40,28 @@ export function setupUIEvents() {
     if(fMapel) fMapel.onchange = updateFilters;
     if(fKelas) fKelas.onchange = updateFilters;
 
-    document.getElementById('w-f')?.addEventListener('input', (e) => { weights.f = e.target.value; renderTable(); });
-    document.getElementById('w-t')?.addEventListener('input', (e) => { weights.t = e.target.value; renderTable(); });
-    document.getElementById('w-a')?.addEventListener('input', (e) => { weights.a = e.target.value; renderTable(); });
+    const btnSaveWeights = document.getElementById('btn-save-weights');
+    if (btnSaveWeights) {
+        btnSaveWeights.addEventListener('click', () => {
+            const wf = parseFloat(document.getElementById('w-f').value) || 0;
+            const wt = parseFloat(document.getElementById('w-t').value) || 0;
+            const wa = parseFloat(document.getElementById('w-a').value) || 0;
+
+            const total = wf + wt + wa;
+            
+            if (Math.abs(total - 100) > 0.1) {
+                alert(`Total persentase bobot harus 100%. Saat ini totalnya: ${total}%`);
+                return;
+            }
+
+            weights.f = wf;
+            weights.t = wt;
+            weights.a = wa;
+            renderTable();
+            
+            alert('Pengaturan bobot berhasil diterapkan untuk perhitungan!');
+        });
+    }
 
     window.openPreviewModal = (type) => {
         const modal = document.getElementById('preview-modal');
