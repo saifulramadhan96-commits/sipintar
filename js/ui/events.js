@@ -40,34 +40,64 @@ export function setupUIEvents() {
     if(fMapel) fMapel.onchange = updateFilters;
     if(fKelas) fKelas.onchange = updateFilters;
 
-   const btnSaveWeights = document.getElementById('btn-save-weights');
+  const btnSaveWeights = document.getElementById('btn-save-weights');
     if (btnSaveWeights) {
-        // Tampilkan nilai bobot terakhir ke dalam form input
+        
+        // 1. BACA DARI DATABASE FIREBASE (AKUN GURU) SAAT HALAMAN DIMUAT
+        const appUser = getAppUser();
+        if (appUser && appUser.customWeights) {
+            weights.f = appUser.customWeights.f;
+            weights.t = appUser.customWeights.t;
+            weights.a = appUser.customWeights.a;
+        }
+
+        // 2. TAMPILKAN NILAI KE DALAM KOLOM INPUT
         document.getElementById('w-f').value = weights.f;
         document.getElementById('w-t').value = weights.t;
         document.getElementById('w-a').value = weights.a;
 
-        btnSaveWeights.addEventListener('click', () => {
+        // 3. PROSES SIMPAN KE SERVER SAAT TOMBOL DIKLIK
+        btnSaveWeights.addEventListener('click', async () => {
             const wf = parseFloat(document.getElementById('w-f').value) || 0;
             const wt = parseFloat(document.getElementById('w-t').value) || 0;
             const wa = parseFloat(document.getElementById('w-a').value) || 0;
 
             const total = wf + wt + wa;
-            
             if (Math.abs(total - 100) > 0.1) {
                 alert(`Total persentase bobot harus 100%. Saat ini totalnya: ${total}%`);
                 return;
             }
 
+            // Terapkan ke tampilan tabel saat ini
             weights.f = wf;
             weights.t = wt;
             weights.a = wa;
             
-            // SIMPAN PERMANEN KE BROWSER
-            localStorage.setItem('sipintar_weights', JSON.stringify(weights));
-            
-            renderTable();
-            alert('Pengaturan bobot berhasil diterapkan dan disimpan untuk sesi berikutnya!');
+            // Ubah tampilan tombol saat proses loading
+            const btnOriginalText = btnSaveWeights.innerHTML;
+            btnSaveWeights.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Menyimpan ke Server...';
+            btnSaveWeights.disabled = true;
+
+            try {
+                // A. Simpan ke database Firebase di koleksi 'users' milik guru yang sedang login
+                await updateDoc(doc(db, 'users', appUser.id), {
+                    customWeights: { f: wf, t: wt, a: wa }
+                });
+                
+                // B. Perbarui memori sesi lokal agar tidak perlu mengambil ulang dari server jika di-refresh
+                appUser.customWeights = { f: wf, t: wt, a: wa };
+                localStorage.setItem('sipintar_user', JSON.stringify(appUser));
+                
+                renderTable();
+                alert('Berhasil! Pengaturan bobot Anda telah tersimpan permanen ke server Firebase.');
+            } catch (err) {
+                console.error("Gagal simpan bobot: ", err);
+                alert('Gagal menyimpan ke server Firebase. Periksa koneksi internet Anda.');
+            } finally {
+                // Kembalikan tombol ke keadaan semula
+                btnSaveWeights.innerHTML = btnOriginalText;
+                btnSaveWeights.disabled = false;
+            }
         });
     }
 
