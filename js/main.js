@@ -1,6 +1,8 @@
 // File: js/main.js
 
 import './config/firebase.js'; 
+import { query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getGradesCollection } from './config/firebase.js';
 import { setupAuth, initLoginForm, handleLogout, getActiveTahun, getActiveSemester, restoreSession, getAppUser } from './services/auth.js';
 import { loadMasterData } from './services/db-master.js';
 import { setupNavigation, buildSidebarNav, switchMenu as coreSwitchMenu } from './ui/navigation.js';
@@ -35,18 +37,6 @@ function init() {
         
         const savedUser = restoreSession();
         if (savedUser) showApp(savedUser);
-        
-        setupFirestoreListener(() => {
-            populateDropdowns(); updateDashboardView();
-            const activeSec = document.querySelector('.section-container:not(.hidden)');
-            if (activeSec) {
-                if (activeSec.id === 'sec-admin-import') renderTableSiswa(); 
-                if (activeSec.id === 'sec-admin-guru') renderTableGuru();
-                if (activeSec.id === 'sec-admin-master') renderMasterDataUI(); 
-                if (activeSec.id === 'sec-nilai') renderTable();
-                if (activeSec.id === 'sec-rekap') renderTableRekap();
-            }
-        });
     });
 
     window.switchMenu = (menuId) => {
@@ -59,21 +49,49 @@ function init() {
     };
 }
 
-export function updateDashboardView() {
-    if (!gradesData) return;
-    let thn = getActiveTahun(); let smt = getActiveSemester();
+export async function updateDashboardView() {
+    let thn = getActiveTahun(); 
+    let smt = getActiveSemester();
+    
     const dashTahun = document.getElementById('dash-filter-tahun');
     const dashSmt = document.getElementById('dash-filter-smt');
     if (dashTahun && dashSmt) { thn = dashTahun.value; smt = dashSmt.value; }
 
-    const activeGrades = gradesData.filter(g => g.tahun === thn && g.semester === smt);
-    const totalSiswa = [...new Set(activeGrades.map(g => g.studentName + g.nisn))].length;
-    const avgNilai = activeGrades.length ? activeGrades.reduce((acc, curr) => acc + (curr.results?.final || 0), 0) / activeGrades.length : 0;
+    let targetGrades = [];
+
+    // OPTIMASI: Jika periode yang difilter adalah periode berjalan, gunakan cache snapshot lokal (0 Reads tambahan)
+    if (thn === getActiveTahun() && smt === getActiveSemester()) {
+        if (!gradesData) return;
+        targetGrades = gradesData.filter(g => g.tahun === thn && g.semester === smt);
+    } else {
+        // Jika memantau histori tahun ajaran lama, panggil server satu kali saja (On-demand Fetch)
+        const btnApply = document.getElementById('btn-apply-dash-filter');
+        try {
+            if(btnApply) { btnApply.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Memuat...'; btnApply.disabled = true; }
+            
+            const q = query(
+                getGradesCollection(), 
+                where("tahun", "==", thn), 
+                where("semester", "==", smt)
+            );
+            const snap = await getDocs(q);
+            targetGrades = snap.docs.map(doc => doc.data());
+            
+        } catch (err) {
+            console.error("Gagal menarik data lama:", err);
+            alert("Gagal memuat histori data dari server.");
+        } finally {
+            if(btnApply) { btnApply.innerHTML = 'Terapkan Filter'; btnApply.disabled = false; }
+        }
+    }
+
+    const totalSiswa = [...new Set(targetGrades.map(g => g.studentName + (g.nisn || '')))].length;
+    const avgNilai = targetGrades.length ? targetGrades.reduce((acc, curr) => acc + (curr.results?.final || 0), 0) / targetGrades.length : 0;
     
     if(document.getElementById('stat-students')) document.getElementById('stat-students').textContent = totalSiswa;
     if(document.getElementById('stat-avg')) document.getElementById('stat-avg').textContent = avgNilai.toFixed(1);
     
-    updateDashboardChart(activeGrades);
+    updateDashboardChart(targetGrades);
 }
 
 function showApp(user) {
@@ -136,11 +154,22 @@ function showApp(user) {
     if (document.getElementById('label-copy-tahun-aktif')) document.getElementById('label-copy-tahun-aktif').textContent = thn;
     if (document.getElementById('label-copy-smt-aktif')) document.getElementById('label-copy-smt-aktif').textContent = smt;
 
-    buildSidebarNav(); window.switchMenu('dashboard');
-    // TAMBAHKAN BARIS INI DI AKHIR FUNGSI showApp
-    // Memaksa listener Firestore berjalan ulang menggunakan Tahun/Semester yang baru saja dipilih saat login
+    buildSidebarNav(); 
+    window.switchMenu('dashboard');
+
+    // KUNCI SINKRONISASI: Listener Firestore diaktifkan di sini dengan jaminan parameter Tahun/Semester aktif sudah terisi penuh
     setupFirestoreListener(() => {
+        populateDropdowns(); 
         updateDashboardView();
+        
+        const activeSec = document.querySelector('.section-container:not(.hidden)');
+        if (activeSec) {
+            if (activeSec.id === 'sec-admin-import') renderTableSiswa(); 
+            if (activeSec.id === 'sec-admin-guru') renderTableGuru();
+            if (activeSec.id === 'sec-admin-master') renderMasterDataUI(); 
+            if (activeSec.id === 'sec-nilai') renderTable();
+            if (activeSec.id === 'sec-rekap') renderTableRekap();
+        }
     });
 }
 
