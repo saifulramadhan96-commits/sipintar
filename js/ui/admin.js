@@ -1,6 +1,6 @@
 // File: js/ui/admin.js
 
-import { doc, deleteDoc, updateDoc, addDoc, serverTimestamp, writeBatch, getDocs, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { doc, deleteDoc, updateDoc, addDoc, serverTimestamp, writeBatch, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { db, getGradesCollection } from '../config/firebase.js';
 import { USERS_DB, getActiveTahun, getActiveSemester, getAppUser } from '../services/auth.js';
 import { MASTER_CLASSES, MASTER_SUBJECTS, MASTER_TAHUN, saveMasterData } from '../services/db-master.js';
@@ -216,42 +216,54 @@ export function setupAdminEvents() {
 
             if (confirm(`Salin siswa dari kelas ${clsAsal} (${thnAsal}) ke kelas ${clsTujuan} untuk periode berjalan (${thnAktif} - ${smtAktif})?`)) {
                 
-                // Kumpulkan data siswa asal
-                const sourceData = gradesData.filter(g => g.tahun === thnAsal && g.className === clsAsal);
-                const map = new Map();
-                sourceData.forEach(g => {
-                    const key = g.studentName.toLowerCase().trim() + "_" + (g.nisn || '').trim();
-                    if (!map.has(key)) map.set(key, { name: g.studentName, nisn: g.nisn });
-                });
-                
-                // SISTEM ANTI-DUPLIKAT: Cek apakah siswa sudah ada di kelas tujuan tahun aktif
-                const existingTujuanData = new Set(
-                    gradesData
-                        .filter(g => g.tahun === thnAktif && g.semester === smtAktif && g.className === clsTujuan)
-                        .map(g => (g.studentName.toLowerCase().trim() + "_" + (g.nisn || '').trim()))
-                );
-
-                const studentsToCopy = [];
-                let countSkipped = 0;
-
-                Array.from(map.values()).forEach(s => {
-                    const key = s.name.toLowerCase().trim() + "_" + (s.nisn || '').trim();
-                    if(existingTujuanData.has(key)) {
-                        countSkipped++; // Siswa sudah ada, lewati
-                    } else {
-                        studentsToCopy.push(s);
-                    }
-                });
-                
-                if (studentsToCopy.length === 0) { 
-                    alert(`Proses dibatalkan. Tidak ada siswa baru yang disalin (Mungkin kelas asal kosong atau semua siswa tersebut sudah ada di kelas tujuan).`); 
-                    return; 
-                }
-
-                btnCopySiswa.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Sedang Menyalin...';
+                btnCopySiswa.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Mengambil Data...';
                 btnCopySiswa.disabled = true;
 
                 try {
+                    // PERBAIKAN: Unduh data siswa asal langsung dari Firestore karena gradesData sekarang hanya berisi tahun berjalan
+                    const qSource = query(
+                        getGradesCollection(),
+                        where("tahun", "==", thnAsal),
+                        where("className", "==", clsAsal)
+                    );
+                    const sourceSnap = await getDocs(qSource);
+                    const sourceData = sourceSnap.docs.map(d => d.data());
+
+                    const map = new Map();
+                    sourceData.forEach(g => {
+                        const key = g.studentName.toLowerCase().trim() + "_" + (g.nisn || '').trim();
+                        if (!map.has(key)) map.set(key, { name: g.studentName, nisn: g.nisn });
+                    });
+                    
+                    // SISTEM ANTI-DUPLIKAT: Cek apakah siswa sudah ada di kelas tujuan tahun aktif
+                    // Ini tetap menggunakan gradesData karena mewakili periode berjalan
+                    const existingTujuanData = new Set(
+                        gradesData
+                            .filter(g => g.tahun === thnAktif && g.semester === smtAktif && g.className === clsTujuan)
+                            .map(g => (g.studentName.toLowerCase().trim() + "_" + (g.nisn || '').trim()))
+                    );
+
+                    const studentsToCopy = [];
+                    let countSkipped = 0;
+
+                    Array.from(map.values()).forEach(s => {
+                        const key = s.name.toLowerCase().trim() + "_" + (s.nisn || '').trim();
+                        if(existingTujuanData.has(key)) {
+                            countSkipped++; 
+                        } else {
+                            studentsToCopy.push(s);
+                        }
+                    });
+                    
+                    if (studentsToCopy.length === 0) { 
+                        alert(`Proses dibatalkan. Tidak ada siswa baru yang disalin (Mungkin kelas asal kosong atau semua siswa tersebut sudah ada di kelas tujuan).`); 
+                        btnCopySiswa.innerHTML = '<i class="ph ph-arrow-circle-right text-lg"></i> Proses Salin'; 
+                        btnCopySiswa.disabled = false;
+                        return; 
+                    }
+
+                    btnCopySiswa.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Sedang Menyalin...';
+
                     let currentBatch = writeBatch(db);
                     let opCount = 0;
                     const commitPromises = [];
@@ -277,8 +289,13 @@ export function setupAdminEvents() {
                     alert(msg);
                     
                     renderTableSiswa();
-                } catch (err) { alert("Terjadi kesalahan sistem saat menyalin data."); } 
-                finally { btnCopySiswa.innerHTML = '<i class="ph ph-arrow-circle-right text-lg"></i> Proses Salin'; btnCopySiswa.disabled = false; }
+                } catch (err) { 
+                    console.error(err);
+                    alert("Terjadi kesalahan sistem saat menyalin data."); 
+                } finally { 
+                    btnCopySiswa.innerHTML = '<i class="ph ph-arrow-circle-right text-lg"></i> Proses Salin'; 
+                    btnCopySiswa.disabled = false; 
+                }
             }
         };
     }
