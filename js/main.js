@@ -137,6 +137,11 @@ function showApp(user) {
     if (document.getElementById('label-copy-smt-aktif')) document.getElementById('label-copy-smt-aktif').textContent = smt;
 
     buildSidebarNav(); window.switchMenu('dashboard');
+    // TAMBAHKAN BARIS INI DI AKHIR FUNGSI showApp
+    // Memaksa listener Firestore berjalan ulang menggunakan Tahun/Semester yang baru saja dipilih saat login
+    setupFirestoreListener(() => {
+        updateDashboardView();
+    });
 }
 
 window.onload = init;
