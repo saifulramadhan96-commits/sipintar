@@ -2,7 +2,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeFirestore, collection, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- KONFIGURASI FIREBASE ---
 const isCanvasEnv = typeof __firebase_config !== 'undefined';
@@ -16,7 +16,6 @@ const firebaseConfig = {
   measurementId: "G-J1SLD3313Y"
 };
 
-
 const appId = typeof __app_id !== 'undefined' ? __app_id : "sipintar-sman1ambunten";
 
 let app, auth, db;
@@ -24,8 +23,21 @@ let app, auth, db;
 try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app);
-    console.log("[DEBUG] Berhasil menghubungkan ke SDK Firebase.");
+    
+    // =========================================================================
+    // OPTIMASI LEVEL 1: MENGAKTIFKAN OFFLINE PERSISTENCE (LOCAL CACHE)
+    // =========================================================================
+    // Menggunakan initializeFirestore untuk menggantikan getFirestore bawaan.
+    // Ditambahkan persistentMultipleTabManager agar sinkronisasi cache tetap aman
+    // meskipun guru membuka aplikasi Si PINTAR di beberapa tab browser sekaligus.
+    // =========================================================================
+    db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+        })
+    });
+    
+    console.log("[DEBUG] Berhasil menghubungkan ke SDK Firebase dengan Local Cache Aktif.");
 } catch(err) {
     console.error("[DEBUG] Gagal menginisialisasi SDK Firebase", err);
 }
