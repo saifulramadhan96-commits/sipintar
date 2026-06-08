@@ -1,6 +1,6 @@
 // File: js/services/db-grades.js
 
-import { onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { query, where, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getGradesCollection } from '../config/firebase.js';
 import { getAppUser, getActiveTahun, getActiveSemester } from './auth.js';
 import { setGradesData, renderTableSiswa } from '../ui/tables.js';
@@ -30,15 +30,33 @@ export function getCalc(s) {
 export function san(v) { return (v===""||v===null||v===undefined) ? null : parseFloat(v); }
 export function ds(v) { return (v===null||v===undefined||v==="") ? "" : v; } // display string
 
-// Listener Real-time ke Firestore
+// Listener Real-time ke Firestore (Dioptimalkan dengan Server-Side Filtering)
 export function setupFirestoreListener(onDataChanged) {
+    // Bersihkan listener lama jika ada untuk mencegah memory leak
     if(unsubGrades) unsubGrades();
     
-    const q = getGradesCollection();
-    console.log(`[DEBUG] Membaca database Firestore di path: ${q.path}`);
+    const thn = getActiveTahun();
+    const smt = getActiveSemester();
+    
+    // PERBAIKAN: Jika user belum login (tahun/semester kosong), tunda pembuatan listener
+    if (!thn || !smt) {
+        console.log("[DEBUG] Firestore Listener ditunda: Periode aktif belum ditentukan.");
+        return;
+    }
+    
+    const baseColl = getGradesCollection();
+    
+    // KUNCI OPTIMASI: Membatasi dokumen yang diunduh hanya untuk tahun & semester aktif di server
+    const q = query(
+        baseColl,
+        where("tahun", "==", thn),
+        where("semester", "==", smt)
+    );
+    
+    console.log(`[DEBUG] Membaca database Firestore pada path: ${baseColl.path} (Filter: ${thn} - ${smt})`);
     
     unsubGrades = onSnapshot(q, snap => {
-        console.log(`[DEBUG] Sukses membaca ${snap.docs.length} data nilai.`);
+        console.log(`[DEBUG] Sukses membaca ${snap.docs.length} data nilai periode berjalan.`);
         let d = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
         d.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
         
