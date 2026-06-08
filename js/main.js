@@ -50,46 +50,59 @@ function init() {
 }
 
 export async function updateDashboardView() {
+    const appUser = getAppUser();
+    if (!appUser) return;
+
     let thn = getActiveTahun(); 
     let smt = getActiveSemester();
     
-    const dashTahun = document.getElementById('dash-filter-tahun');
-    const dashSmt = document.getElementById('dash-filter-smt');
-    if (dashTahun && dashSmt) { thn = dashTahun.value; smt = dashSmt.value; }
+    const isWakasek = appUser.role === 'wakasek' || appUser.tugasTambahan === 'Wakasek Kurikulum';
+    const isAdmin = appUser.role === 'admin';
+    
+    const filterDash = document.getElementById('dashboard-filter-bar');
+    
+    // PERBAIKAN: Hanya membaca dropdown filter jika sedang tidak disembunyikan (Bukan Guru biasa)
+    if (filterDash && !filterDash.classList.contains('hidden')) {
+        const dashTahun = document.getElementById('dash-filter-tahun');
+        const dashSmt = document.getElementById('dash-filter-smt');
+        // PENTING: Jangan timpa value thn/smt jika value dari dropdown masih kosong ("")
+        if (dashTahun && dashTahun.value !== "") thn = dashTahun.value;
+        if (dashSmt && dashSmt.value !== "") smt = dashSmt.value;
+    }
 
     let targetGrades = [];
 
-    // OPTIMASI: Jika periode yang difilter adalah periode berjalan, gunakan cache snapshot lokal (0 Reads tambahan)
     if (thn === getActiveTahun() && smt === getActiveSemester()) {
         if (!gradesData) return;
         targetGrades = gradesData.filter(g => g.tahun === thn && g.semester === smt);
     } else {
-        // Jika memantau histori tahun ajaran lama, panggil server satu kali saja (On-demand Fetch)
         const btnApply = document.getElementById('btn-apply-dash-filter');
         try {
             if(btnApply) { btnApply.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Memuat...'; btnApply.disabled = true; }
-            
-            const q = query(
-                getGradesCollection(), 
-                where("tahun", "==", thn), 
-                where("semester", "==", smt)
-            );
+            const q = query(getGradesCollection(), where("tahun", "==", thn), where("semester", "==", smt));
             const snap = await getDocs(q);
             targetGrades = snap.docs.map(doc => doc.data());
-            
         } catch (err) {
             console.error("Gagal menarik data lama:", err);
-            alert("Gagal memuat histori data dari server.");
         } finally {
             if(btnApply) { btnApply.innerHTML = 'Terapkan Filter'; btnApply.disabled = false; }
         }
     }
 
-    const totalSiswa = [...new Set(targetGrades.map(g => g.studentName + (g.nisn || '')))].length;
-    const avgNilai = targetGrades.length ? targetGrades.reduce((acc, curr) => acc + (curr.results?.final || 0), 0) / targetGrades.length : 0;
+    // Filter khusus Guru (Hanya bisa menghitung statistik dari kelas/mapel-nya sendiri)
+    if (!isAdmin && !isWakasek) {
+        targetGrades = targetGrades.filter(g => g.teacherName === appUser.username || g.teacherName === 'admin');
+    }
+
+    // Hitung jumlah siswa unik (menggabungkan nama + nisn agar tidak dobel karena 1 siswa ada 15 mapel)
+    const totalSiswa = [...new Set(targetGrades.map(g => g.studentName + "_" + (g.nisn || '')))].length;
+    const avgNilai = targetGrades.length ? targetGrades.reduce((acc, curr) => acc + (parseFloat(curr.results?.final) || 0), 0) / targetGrades.length : 0;
     
-    if(document.getElementById('stat-students')) document.getElementById('stat-students').textContent = totalSiswa;
-    if(document.getElementById('stat-avg')) document.getElementById('stat-avg').textContent = avgNilai.toFixed(1);
+    const statStudents = document.getElementById('stat-students');
+    const statAvg = document.getElementById('stat-avg');
+    
+    if(statStudents) statStudents.textContent = totalSiswa;
+    if(statAvg) statAvg.textContent = avgNilai.toFixed(1);
     
     updateDashboardChart(targetGrades);
 }
@@ -157,7 +170,6 @@ function showApp(user) {
     buildSidebarNav(); 
     window.switchMenu('dashboard');
 
-    // KUNCI SINKRONISASI: Listener Firestore diaktifkan di sini dengan jaminan parameter Tahun/Semester aktif sudah terisi penuh
     setupFirestoreListener(() => {
         populateDropdowns(); 
         updateDashboardView();
