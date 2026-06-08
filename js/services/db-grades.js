@@ -12,7 +12,6 @@ export let gradesData = [];
 export let unsubGrades = null;
 export let weights = { f: 25, t: 25, a: 50 }; // Default bobot
 
-// Fungsi Kalkulasi Nilai
 export function getCalc(s) {
     if(!s) return {final:"0.0"};
     const ext = (arr) => arr.filter(v => v!=="" && v!==null && !isNaN(parseFloat(v))).map(v => parseFloat(v));
@@ -26,98 +25,51 @@ export function getCalc(s) {
     return { avgFormative: aF.toFixed(1), avgTask: aT.toFixed(1), final: fin.toFixed(1) };
 }
 
-// Fungsi helper untuk sanitasi angka
 export function san(v) { return (v===""||v===null||v===undefined) ? null : parseFloat(v); }
-export function ds(v) { return (v===null||v===undefined||v==="") ? "" : v; } // display string
+export function ds(v) { return (v===null||v===undefined||v==="") ? "" : v; } 
 
-// Listener Real-time ke Firestore (Dioptimalkan dengan Server-Side Filtering)
 export function setupFirestoreListener(onDataChanged) {
-    // Bersihkan listener lama jika ada untuk mencegah memory leak
     if(unsubGrades) unsubGrades();
     
     const thn = getActiveTahun();
     const smt = getActiveSemester();
     
-    // PERBAIKAN: Jika user belum login (tahun/semester kosong), tunda pembuatan listener
-    if (!thn || !smt) {
-        console.log("[DEBUG] Firestore Listener ditunda: Periode aktif belum ditentukan.");
-        return;
-    }
+    if (!thn || !smt) return;
     
     const baseColl = getGradesCollection();
-    
-    // KUNCI OPTIMASI: Membatasi dokumen yang diunduh hanya untuk tahun & semester aktif di server
-    const q = query(
-        baseColl,
-        where("tahun", "==", thn),
-        where("semester", "==", smt)
-    );
-    
-    console.log(`[DEBUG] Membaca database Firestore pada path: ${baseColl.path} (Filter: ${thn} - ${smt})`);
+    const q = query(baseColl, where("tahun", "==", thn), where("semester", "==", smt));
     
     unsubGrades = onSnapshot(q, snap => {
-        console.log(`[DEBUG] Sukses membaca ${snap.docs.length} data nilai periode berjalan.`);
         let d = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
         d.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
         
         gradesData = d;
-        setGradesData(d); // Kirim data ke UI Tables
+        setGradesData(d); // Kirim data ke tabel
         
-        // Update statistik di dashboard
-        updateStats();
+        // CATATAN PERBAIKAN: Fungsi updateStats() yang lama telah DICABUT dari sini
+        // agar tidak terjadi tabrakan update DOM dengan file main.js
         
-        // Beri tahu UI untuk render ulang (jika callback disediakan)
         if(onDataChanged) onDataChanged();
         
     }, err => {
-        console.error("[DEBUG] GAGAL BACA DATABASE", err);
         alert("Gagal memuat data nilai!");
     });
 }
 
-// Update Angka di Dashboard Utama
-export function updateStats() {
-    const appUser = getAppUser();
-    if(!appUser) return;
-
-    const activeTahun = getActiveTahun();
-    const activeSemester = getActiveSemester();
-
-    let baseD = gradesData.filter(g => g.tahun === activeTahun && g.semester === activeSemester);
-    let d = appUser.role === 'guru' ? baseD.filter(g => g.teacherName === appUser.username || g.teacherName === 'admin') : baseD;
-    
-    const statStudents = document.getElementById('stat-students');
-    const statAvg = document.getElementById('stat-avg');
-    
-    if (statStudents) statStudents.textContent = d.length;
-    if (statAvg) {
-        let tot = d.reduce((a,c)=>a+(c.results?.final||0),0);
-        statAvg.textContent = d.length ? (tot/d.length).toFixed(1) : "0.0";
-    }
-}
-
-// Simpan Nilai Baru ke Firestore & Catat Log
 export async function saveNewGrade(payload, editId = null) {
     const cRef = getGradesCollection();
     try {
         if (editId) {
             payload.updatedAt = serverTimestamp();
             await updateDoc(doc(cRef, editId), payload);
-            console.log("[DEBUG] Sukses memperbarui data " + editId);
-            
-            // CATAT LOG UPDATE
-            await writeLog("UPDATE_NILAI", `Mengubah nilai siswa: ${payload.studentName} (${payload.subject})`);
+            await writeLog("UPDATE_NILAI", `Mengubah nilai siswa: ${payload.studentName}`);
         } else {
             payload.createdAt = serverTimestamp();
             await addDoc(cRef, payload);
-            console.log("[DEBUG] Sukses menambahkan data baru ke Firestore.");
-            
-            // CATAT LOG TAMBAH
-            await writeLog("TAMBAH_SISWA", `Menambah siswa baru: ${payload.studentName} ke kelas ${payload.className}`);
+            await writeLog("TAMBAH_SISWA", `Menambah siswa baru: ${payload.studentName}`);
         }
         return true;
     } catch (err) {
-        console.error("[DEBUG] GAGAL MENYIMPAN KE FIRESTORE", err);
         throw err;
     }
 }
